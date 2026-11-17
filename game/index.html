@@ -3,16 +3,64 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Dodger</title>
-<style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* Read aloud, never shown: the status line screen readers announce. */
-  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-</style>
+<title>Vice Shores — Make GTA 6</title>
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.min.js"
+  }
+}
+</script>
 </head>
 <body>
-<canvas id="game" aria-label="Block Dodger: move the paddle left and right to dodge falling blocks and catch coins"></canvas>
+<canvas id="game" aria-label="Vice Shores: an open-world crime game. Walk the city, steal cars, outrun the law."></canvas>
+
+<div id="hud" hidden>
+  <div id="hud-top-left">
+    <div id="cash">$1,250</div>
+    <div id="objective">Objective: Meet Rico at the Marina Pier</div>
+  </div>
+  <div id="hud-top-right">
+    <div id="wanted" aria-label="Wanted level 0 of 5">☆☆☆☆☆</div>
+    <div id="health-wrap"><div id="health-bar"></div><span id="health-text">100</span></div>
+  </div>
+  <div id="hud-bottom-left">
+    <div id="clock">Day 1 · 17:42</div>
+    <div id="speed">0 mph · on foot</div>
+    <div id="hint">WASD move · Shift run · drag mouse to look · M mute · P pause</div>
+  </div>
+  <canvas id="minimap" width="180" height="180" aria-label="Minimap of Vice Shores"></canvas>
+  <div id="toast" hidden></div>
+</div>
+
+<div id="start-screen">
+  <div id="start-card">
+    <h1>VICE SHORES</h1>
+    <p id="tagline">Sun, salt air, and one last score.</p>
+    <p id="story">You are <b>Marisol Vega</b>, a wheelwoman fresh out of the county
+    lockup. The city of Vice Shores never sleeps — and neither does its
+    debt. Walk the avenues, borrow a car or two, and make the Marina Pier
+    meet before the sun goes down.</p>
+    <div id="start-buttons">
+      <button id="btn-new">New Game</button>
+      <button id="btn-continue" disabled>Continue</button>
+    </div>
+    <p id="controls">WASD / arrows — walk &nbsp;·&nbsp; Shift — run &nbsp;·&nbsp; Mouse drag — look
+    &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; M — mute</p>
+    <p id="start-foot">An original open-world crime game. No real city, no real people,
+    no borrowed assets — every street of Vice Shores was built for this game.</p>
+  </div>
+</div>
+
+<div id="pause-screen" hidden>
+  <div id="pause-card">
+    <h2>Paused</h2>
+    <p>Your progress is saved to this browser.</p>
+    <button id="btn-resume">Resume</button>
+  </div>
+</div>
+
 <p id="status" role="status" aria-live="polite"></p>
 <script type="module" src="./src/main.js"></script>
 </body>

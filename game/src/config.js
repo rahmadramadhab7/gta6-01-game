@@ -1,61 +1,91 @@
-// Every tuning number and colour in one place. The playfield is a fixed 1280x720 logical area;
-// the renderer scales it to the window, so no rule below depends on the screen size.
-
-export const FIELD = { width: 1280, height: 720, groundY: 664 };
+// Vice Shores — every tuning number and colour in one place. The city is a
+// 5x5 grid of blocks on a flat plane, centred on (0, 0), streets running north-south
+// and east-west. One world unit is about one metre.
 
 /** The simulation's fixed step, in seconds: 60 updates a second whatever the display's rate. */
 export const STEP = 1 / 60;
 
+/** City geometry: block size, street width, and the pitch between street centrelines. */
+export const CITY = {
+  blocks: 5,
+  blockSize: 34,
+  streetWidth: 12,
+  pitch: 46,
+  /** Half the city extent, streets included: streets run from -115 to +115. */
+  halfExtent: 115,
+  /** The beach and ocean sit west of the city, past this x. */
+  beachX: -138,
+};
+
+/** Street centreline positions, one per gap between (and around) the blocks. */
+export const STREET_LINES = [-115, -69, -23, 23, 69, 115];
+
 export const PLAYER = {
-  width: 72,
-  height: 24,
-  speed: 560,
-  invulnerable: 1.5,
+  walkSpeed: 6,
+  runSpeed: 10.5,
+  radius: 0.55,
+  height: 1.8,
+  /** How fast the body turns toward the movement direction. */
+  turnRate: 12,
 };
 
-export const LIVES = 3;
-
-export const BLOCK = {
-  minWidth: 40,
-  maxWidth: 110,
-  height: 36,
-  speed: 240,
-  speedPerLevel: 30,
-  speedJitter: 90,
-  interval: 0.55,
-  intervalScale: 0.88,
-  minInterval: 0.14,
-  dodgePoints: 1,
+export const CAMERA = {
+  distance: 9.5,
+  height: 4.2,
+  /** How fast the camera catches up to the player (per second). */
+  followRate: 6,
+  minPitch: 0.12,
+  maxPitch: 0.9,
 };
 
-export const COIN = {
-  size: 24,
-  speed: 190,
-  speedPerLevel: 14,
-  interval: 1.4,
-  intervalJitter: 0.8,
-  points: 10,
+export const TRAFFIC = {
+  cars: 12,
+  pedestrians: 14,
+  carSpeed: 9,
+  carSpeedJitter: 4,
+  pedSpeed: 1.4,
 };
 
-/** Seconds of play per level, and the last level: speeds and spawn rates stop growing there. */
-export const LEVEL = { seconds: 12, max: 12 };
+export const CLOCK = {
+  /** In-game minutes that pass per real second while playing. */
+  minutesPerSecond: 1,
+  /** Day 1 opens at golden hour. */
+  startDay: 1,
+  startMinutes: 17 * 60 + 42,
+};
 
-/** How many falling things can exist at once; the pool is allocated once, at boot. */
-export const POOL_SIZE = 64;
+/** Where a save is kept between visits (this browser only). */
+export const SAVE_KEY = 'vice-shores.save.v1';
+
+export const START = {
+  cash: 1250,
+  health: 100,
+  wanted: 0,
+  objective: 'Meet Rico at the Marina Pier',
+  spawn: { x: 23, z: 96, heading: Math.PI },
+};
 
 export const PALETTE = {
-  backdrop: '#11141b',
-  sky: '#1b1f2a',
-  ground: '#2a3040',
-  player: '#4fc3f7',
-  block: '#e5534b',
-  coin: '#f2c94c',
-  panel: '#252b38',
-  text: '#eef1f5',
-  muted: '#8b93a3',
+  skyTop: 0x2b3a6e,
+  skyHorizon: 0xff9a56,
+  sun: 0xffd166,
+  fog: 0xe88a4f,
+  ground: 0x3a3340,
+  asphalt: 0x2e2a33,
+  sidewalk: 0x8d8272,
+  laneMark: 0xd8c25a,
+  crosswalk: 0xe8e2d4,
+  ocean: 0x2e6f8e,
+  sand: 0xd9b380,
+  building: [0xe8a87c, 0xd97b6c, 0x7fb5a8, 0xe5c07b, 0x9b8ec4, 0xc46b5d, 0x6fa8a0, 0xdd9a5b],
+  windowLit: 0xffd166,
+  windowDark: 0x2c3550,
+  car: [0xc0392b, 0x2e86c1, 0xf1c40f, 0x7d3c98, 0x1abc9c, 0xe67e22, 0x95a5a6, 0x34495e],
+  ped: [0xe74c3c, 0x3498db, 0xf39c12, 0x2ecc71, 0x9b59b6, 0xecf0f1],
+  playerJacket: 0x1f8a70,
+  playerPants: 0x2c3550,
+  playerSkin: 0xc98d64,
+  playerCap: 0xff7a59,
 };
 
 export const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-
-/** Where the best score is kept between visits (this browser only). */
-export const BEST_KEY = 'block-dodger.best';
