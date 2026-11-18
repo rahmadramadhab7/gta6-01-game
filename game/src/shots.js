@@ -20,16 +20,38 @@ function idle(game, seconds) {
   }
 }
 
+/** Drive straight ahead for `seconds` at full throttle. */
+function driveForward(game, seconds) {
+  const steps = Math.round(seconds / STEP);
+  for (let index = 0; index < steps; index += 1) {
+    game.step(STEP, { forward: true, back: false, left: false, right: false, run: false });
+  }
+}
+
 /**
  * Set the game to the named scene and return the screen to show over it:
  *  - play: the cover — Marisol walking the main avenue at sunset, traffic passing,
  *    HUD and minimap on.
  *  - street: on foot downtown among pedestrians and traffic.
  *  - pier: at the Marina Pier at sunset, the Day 1 objective complete.
+ *  - drive: behind the wheel — a stolen car racing down the avenue at sunset,
+ *    speed and wanted stars on the HUD.
  *  - start (or anything else): the title screen over the city at dusk.
  */
 export function stageShot(name, game) {
   game.reset();
+  if (name === 'drive') {
+    // Steal the first parked car, turn it toward the sunset, and drive it west
+    // down Marina Avenue — the camera then looks into the sunset, not the shade.
+    const spot = game.parkedSpot(0);
+    game.placePlayer(spot.x + 2.5, spot.z, spot.heading);
+    game.enterCar();
+    game.state.driving.heading = -Math.PI / 2;
+    game.setCameraYaw(Math.PI / 2);
+    driveForward(game, 4);
+    game.showHud();
+    return { screen: 'play' };
+  }
   if (name === 'play') {
     // The cover: walking west down the Marina Avenue (z = 23) into the sunset,
     // traffic passing, towers on both sides, HUD and minimap on.

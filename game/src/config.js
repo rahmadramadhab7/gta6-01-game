@@ -46,6 +46,21 @@ export const TRAFFIC = {
   pedSpeed: 1.4,
 };
 
+/** Arcade driving: how a stolen car accelerates, brakes, turns and bounces. */
+export const VEHICLE = {
+  accel: 16,
+  brake: 26,
+  reverseAccel: 9,
+  maxSpeed: 34,
+  maxReverse: 11,
+  /** Steering rate at full speed, radians per second. */
+  turnRate: 2.1,
+  /** Collision circle radius of a car, in world units. */
+  radius: 1.7,
+  /** How close Marisol must stand to a car to steal it. */
+  stealDistance: 3.6,
+};
+
 export const CLOCK = {
   /** In-game minutes that pass per real second while playing. */
   minutesPerSecond: 1,

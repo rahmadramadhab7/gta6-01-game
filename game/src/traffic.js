@@ -6,7 +6,7 @@ import { CITY, PALETTE, STREET_LINES, TRAFFIC } from './config.js';
 import { createRandom, randomPick } from './random.js';
 
 /** A low-poly car: body, cabin, four wheels, headlights that glow at dusk. */
-function makeCar(color) {
+export function makeCar(color) {
   const car = new THREE.Group();
   const paint = new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.5 });
   const glass = new THREE.MeshStandardMaterial({ color: 0x1a2436, roughness: 0.15, metalness: 0.6 });

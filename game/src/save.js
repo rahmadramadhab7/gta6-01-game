@@ -14,6 +14,7 @@ export function defaultSave() {
     day: 1,
     minutes: 17 * 60 + 42,
     objective: START.objective,
+    vehicles: null,
   };
 }
 

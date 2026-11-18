@@ -10,9 +10,10 @@ import { CAMERA, CLOCK, START, STEP } from './config.js';
 import { createCity } from './city.js';
 import { createPlayer, snapCamera, stepPlayer, updateCamera } from './player.js';
 import { createTraffic, stepTraffic, trafficDots } from './traffic.js';
+import { createVehicles, enterCar, exitCar, parkedSpot, resetVehicles, restoreVehicles, serializeVehicles, stepVehicle, vehicleDots } from './vehicle.js';
 import { createHud } from './hud.js';
 import { createAudio } from './audio.js';
-import { ACTION_MUTE, ACTION_PAUSE, createInput } from './input.js';
+import { ACTION_ENTER, ACTION_MUTE, ACTION_PAUSE, createInput } from './input.js';
 import { clearSave, defaultSave, hasSave, loadSave, writeSave } from './save.js';
 import { stageShot } from './shots.js';
 
@@ -49,6 +50,7 @@ const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerH
 const city = createCity(scene, seed);
 const player = createPlayer(scene, START.spawn);
 const traffic = createTraffic(scene, seed);
+const vehicles = createVehicles(scene, seed);
 const hud = createHud();
 const audio = createAudio();
 const input = createInput(canvas);
@@ -63,6 +65,8 @@ const state = {
   objective: START.objective,
   saveTimer: AUTOSAVE_SECONDS,
   orbitAngle: 0.6,
+  /** The car Marisol is driving, or null when she is on foot. */
+  driving: null,
 };
 
 /** The game object the screenshot staging drives: reset, step, place, render. */
@@ -77,6 +81,9 @@ const game = {
     state.minutes = CLOCK.startMinutes;
     state.objective = START.objective;
     state.screen = 'play';
+    state.driving = null;
+    resetVehicles(vehicles);
+    player.group.visible = true;
     player.x = START.spawn.x;
     player.z = START.spawn.z;
     player.heading = START.spawn.heading;
@@ -91,11 +98,21 @@ const game = {
     hud.setSpeed(0, 'on foot');
   },
   placePlayer(x, z, heading) {
+    state.driving = null;
+    player.group.visible = true;
     player.x = x;
     player.z = z;
     player.heading = heading;
     player.cameraYaw = heading + Math.PI;
     snapCamera(player, camera);
+  },
+  /** Where parked car `index` waits, for the driving screenshot. */
+  parkedSpot(index) {
+    return parkedSpot(vehicles, index);
+  },
+  /** Steal the nearest car (or climb out, if already driving) and report it. */
+  enterCar() {
+    return tryEnterCar();
   },
   setCameraYaw(yaw) {
     player.cameraYaw = yaw;
@@ -112,6 +129,27 @@ const game = {
     pauseScreen.hidden = true;
   },
   step(dt, move) {
+    if (state.driving) {
+      const speed = stepVehicle(vehicles, move, city.colliders, traffic, dt);
+      // The chase camera follows the player, so mirror the car onto her.
+      player.x = state.driving.x;
+      player.z = state.driving.z;
+      player.heading = state.driving.heading;
+      player.speed = Math.abs(speed);
+      player.moving = Math.abs(speed) > 0.5;
+      stepTraffic(traffic, dt);
+      state.minutes += CLOCK.minutesPerSecond * dt;
+      if (state.minutes >= 24 * 60) {
+        state.minutes -= 24 * 60;
+        state.day += 1;
+      }
+      updateCamera(player, camera, dt);
+      hud.setClock(state.day, state.minutes);
+      hud.setSpeed(Math.abs(speed) * 2.23694, state.driving.name);
+      hud.tickToast(dt);
+      hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles)]);
+      return;
+    }
     stepPlayer(player, move, city.colliders, dt);
     stepTraffic(traffic, dt);
     state.minutes += CLOCK.minutesPerSecond * dt;
@@ -123,13 +161,45 @@ const game = {
     hud.setClock(state.day, state.minutes);
     hud.setSpeed(player.speed * 2.23694, 'on foot');
     hud.tickToast(dt);
-    hud.drawMinimap(player, trafficDots(traffic));
+    hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles)]);
     audio.stepFootsteps(player.moving, player.speed > 8);
   },
   render() {
     renderer.render(scene, camera);
   },
 };
+
+/** E: climb out of the car, or steal the nearest car (wanted +1 on a fresh theft). */
+function tryEnterCar() {
+  if (state.driving) {
+    exitCar(vehicles, player);
+    state.driving = null;
+    player.group.visible = true;
+    hud.setSpeed(0, 'on foot');
+    hud.showToast('Out of the car', 2);
+    return { car: null, stole: false };
+  }
+  const found = enterCar(vehicles, traffic, player.x, player.z);
+  if (!found) {
+    hud.showToast('No car nearby — press E next to a car', 2);
+    return { car: null, stole: false };
+  }
+  state.driving = found.car;
+  player.group.visible = false;
+  player.x = found.car.x;
+  player.z = found.car.z;
+  player.heading = found.car.heading;
+  player.cameraYaw = found.car.heading + Math.PI;
+  snapCamera(player, camera);
+  if (found.stole) {
+    state.wanted = Math.min(5, state.wanted + 1);
+    hud.setWanted(state.wanted);
+    hud.showToast(`Stole the ${found.car.name} — wanted level up`, 4);
+  } else {
+    hud.showToast(`Driving the ${found.car.name}`, 2);
+  }
+  return found;
+}
 
 function snapshotSave() {
   return {
@@ -142,6 +212,7 @@ function snapshotSave() {
     day: state.day,
     minutes: state.minutes,
     objective: state.objective,
+    vehicles: serializeVehicles(vehicles),
   };
 }
 
@@ -157,6 +228,14 @@ function applySave(save) {
   player.heading = save.heading;
   player.cameraYaw = save.heading + Math.PI;
   snapCamera(player, camera);
+  state.driving = restoreVehicles(vehicles, scene, save.vehicles, traffic);
+  if (state.driving) {
+    player.group.visible = false;
+    player.x = state.driving.x;
+    player.z = state.driving.z;
+    player.heading = state.driving.heading;
+    snapCamera(player, camera);
+  }
   hud.setCash(state.cash);
   hud.setHealth(state.health);
   hud.setWanted(state.wanted);
@@ -244,6 +323,9 @@ function runGame() {
     if (actions & ACTION_MUTE) {
       const muted = audio.setMuted(!audio.isMuted());
       hud.showToast(muted ? 'Sound off' : 'Sound on', 2);
+    }
+    if (actions & ACTION_ENTER) {
+      if (state.screen === 'play') tryEnterCar();
     }
     if (actions & ACTION_PAUSE) {
       if (state.screen === 'play') pauseGame();
