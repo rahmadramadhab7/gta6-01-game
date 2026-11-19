@@ -2,15 +2,16 @@
 // in fixed 1/60 s steps (several in a slow frame, none in a fast one), and the renderer
 // paints what is there. The game moves between three screens: title, play and paused.
 //
-// ?seed=N fixes the city and the traffic. ?shot=play|street|pier|start (with &seed=N)
-// stages that scene instead of running the loop, paints it twice and sets
-// window.__shotReady for a screenshot.
+// ?seed=N fixes the city and the traffic. ?shot=play|street|pier|drive|police|start
+// (with &seed=N) stages that scene instead of running the loop, paints it twice and
+// sets window.__shotReady for a screenshot.
 import * as THREE from 'three';
 import { CAMERA, CLOCK, START, STEP } from './config.js';
 import { createCity } from './city.js';
 import { createPlayer, snapCamera, stepPlayer, updateCamera } from './player.js';
 import { createTraffic, stepTraffic, trafficDots } from './traffic.js';
 import { createVehicles, enterCar, exitCar, parkedSpot, resetVehicles, restoreVehicles, serializeVehicles, stepVehicle, vehicleDots } from './vehicle.js';
+import { clearPolice, createPolice, policeDots, stageChase, stepPolice } from './police.js';
 import { createHud } from './hud.js';
 import { createAudio } from './audio.js';
 import { ACTION_ENTER, ACTION_MUTE, ACTION_PAUSE, createInput } from './input.js';
@@ -51,6 +52,7 @@ const city = createCity(scene, seed);
 const player = createPlayer(scene, START.spawn);
 const traffic = createTraffic(scene, seed);
 const vehicles = createVehicles(scene, seed);
+const police = createPolice(scene, seed);
 const hud = createHud();
 const audio = createAudio();
 const input = createInput(canvas);
@@ -65,6 +67,8 @@ const state = {
   objective: START.objective,
   saveTimer: AUTOSAVE_SECONDS,
   orbitAngle: 0.6,
+  /** True while the wanted level is up but no police unit has eyes on Marisol. */
+  evading: false,
   /** The car Marisol is driving, or null when she is on foot. */
   driving: null,
 };
@@ -82,6 +86,9 @@ const game = {
     state.objective = START.objective;
     state.screen = 'play';
     state.driving = null;
+    state.evading = false;
+    wantedMode = 'clear';
+    clearPolice(police);
     resetVehicles(vehicles);
     player.group.visible = true;
     player.x = START.spawn.x;
@@ -93,6 +100,8 @@ const game = {
     hud.setCash(state.cash);
     hud.setHealth(state.health);
     hud.setWanted(state.wanted);
+    hud.setWantedState('clear');
+    hud.hideBanner();
     hud.setObjective(state.objective);
     hud.setClock(state.day, state.minutes);
     hud.setSpeed(0, 'on foot');
@@ -114,8 +123,17 @@ const game = {
   enterCar() {
     return tryEnterCar();
   },
+  /** Put `count` patrol cars on Marisol's tail, for the police screenshot. */
+  spawnPoliceChase(count, speed) {
+    stageChase(police, player.x, player.z, player.heading, count, speed);
+  },
   setCameraYaw(yaw) {
     player.cameraYaw = yaw;
+    snapCamera(player, camera);
+  },
+  /** Widen the chase camera (used by the police shot so the whole pursuit fits). */
+  setCameraDistance(distance) {
+    CAMERA.distance = distance;
     snapCamera(player, camera);
   },
   showHud() {
@@ -147,7 +165,9 @@ const game = {
       hud.setClock(state.day, state.minutes);
       hud.setSpeed(Math.abs(speed) * 2.23694, state.driving.name);
       hud.tickToast(dt);
-      hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles)]);
+      hud.tickBanner(dt);
+      stepWanted(dt);
+      hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles), ...policeDots(police)]);
       return;
     }
     stepPlayer(player, move, city.colliders, dt);
@@ -161,7 +181,9 @@ const game = {
     hud.setClock(state.day, state.minutes);
     hud.setSpeed(player.speed * 2.23694, 'on foot');
     hud.tickToast(dt);
-    hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles)]);
+    hud.tickBanner(dt);
+    stepWanted(dt);
+    hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles), ...policeDots(police)]);
     audio.stepFootsteps(player.moving, player.speed > 8);
   },
   render() {
@@ -201,6 +223,68 @@ function tryEnterCar() {
   return found;
 }
 
+/** One step of the wanted system: the chase advances, stars move, a bust ends the run. */
+let wantedMode = 'clear';
+function stepWanted(dt) {
+  const result = stepPolice(police, {
+    wanted: state.wanted,
+    x: player.x,
+    z: player.z,
+    speed: state.driving ? Math.abs(state.driving.speed) : player.speed,
+    driving: !!state.driving,
+    driven: state.driving,
+    colliders: city.colliders,
+  }, dt);
+  if (result.wantedDelta !== 0) {
+    state.wanted = Math.max(0, Math.min(5, state.wanted + result.wantedDelta));
+    hud.setWanted(state.wanted);
+    if (result.rammed) hud.showToast('Ram a police car — wanted level up', 3);
+    else if (result.wantedDelta < 0) hud.showToast('The heat is cooling off…', 3);
+  }
+  const mode = state.wanted === 0 ? 'clear' : (police.evading ? 'evading' : 'wanted');
+  if (mode !== wantedMode) {
+    wantedMode = mode;
+    state.evading = police.evading;
+    hud.setWantedState(mode);
+  }
+  if (result.busted) applyBusted();
+}
+
+/** Busted: the Vice Shores PD takes a cut of the cash, the heat resets, and
+ *  Marisol is dropped back at the precinct steps on foot. */
+function applyBusted() {
+  const fine = Math.min(state.cash, Math.floor(state.cash * 0.1));
+  state.cash -= fine;
+  state.wanted = 0;
+  state.evading = false;
+  wantedMode = 'clear';
+  if (state.driving) {
+    exitCar(vehicles, player);
+    state.driving = null;
+    player.group.visible = true;
+  }
+  clearPolice(police);
+  player.x = START.spawn.x;
+  player.z = START.spawn.z;
+  player.heading = START.spawn.heading;
+  player.cameraYaw = START.spawn.heading + Math.PI;
+  player.cameraPitch = 0.32;
+  snapCamera(player, camera);
+  hud.setCash(state.cash);
+  hud.setWanted(0);
+  hud.setWantedState('clear');
+  hud.setSpeed(0, 'on foot');
+  hud.showBanner(
+    'BUSTED',
+    fine > 0
+      ? `The Vice Shores PD took $${fine.toLocaleString('en-US')} in fines`
+      : 'The Vice Shores PD let you off with a warning',
+    4,
+  );
+  hud.showToast('Busted — back at the precinct steps', 4);
+  writeSave(snapshotSave());
+}
+
 function snapshotSave() {
   return {
     x: player.x,
@@ -219,7 +303,12 @@ function snapshotSave() {
 function applySave(save) {
   state.cash = save.cash;
   state.health = save.health;
-  state.wanted = save.wanted;
+  // A loaded game starts clean: the law forgets you between visits, so the
+  // wanted level always comes back as 0 and no patrol car is waiting for you.
+  state.wanted = 0;
+  state.evading = false;
+  wantedMode = 'clear';
+  clearPolice(police);
   state.day = save.day;
   state.minutes = save.minutes;
   state.objective = save.objective;
@@ -239,6 +328,8 @@ function applySave(save) {
   hud.setCash(state.cash);
   hud.setHealth(state.health);
   hud.setWanted(state.wanted);
+  hud.setWantedState('clear');
+  hud.hideBanner();
   hud.setObjective(state.objective);
   hud.setClock(state.day, state.minutes);
 }
@@ -258,6 +349,7 @@ function startPlaying(fresh) {
   startScreen.hidden = true;
   pauseScreen.hidden = true;
   hud.show();
+  hud.hideBanner();
   hud.setCash(state.cash);
   hud.setHealth(state.health);
   hud.setWanted(state.wanted);

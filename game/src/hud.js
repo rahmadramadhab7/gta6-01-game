@@ -19,6 +19,10 @@ export function createHud() {
     cash: document.getElementById('cash'),
     objective: document.getElementById('objective'),
     wanted: document.getElementById('wanted'),
+    wantedState: document.getElementById('wanted-state'),
+    banner: document.getElementById('banner'),
+    bannerMain: document.getElementById('banner-main'),
+    bannerSub: document.getElementById('banner-sub'),
     healthBar: document.getElementById('health-bar'),
     healthText: document.getElementById('health-text'),
     clock: document.getElementById('clock'),
@@ -28,6 +32,7 @@ export function createHud() {
   };
   const ctx = elements.minimap.getContext('2d');
   let toastTimer = 0;
+  let bannerTimer = 0;
   return {
     elements,
     show() { elements.root.hidden = false; },
@@ -42,6 +47,37 @@ export function createHud() {
       const stars = [0, 1, 2, 3, 4].map((i) => (i < level ? '<span class="lit">★</span>' : '☆')).join('');
       elements.wanted.innerHTML = stars;
       elements.wanted.setAttribute('aria-label', `Wanted level ${level} of 5`);
+    },
+    /** The chase state under the stars: WANTED while seen, EVADING while hidden. */
+    setWantedState(mode) {
+      if (mode === 'wanted') {
+        elements.wantedState.textContent = 'WANTED';
+        elements.wantedState.className = 'state-wanted';
+      } else if (mode === 'evading') {
+        elements.wantedState.textContent = 'EVADING';
+        elements.wantedState.className = 'state-evading';
+      } else {
+        elements.wantedState.textContent = '';
+        elements.wantedState.className = '';
+      }
+    },
+    /** A big centre-screen banner (BUSTED) with a smaller line under it. */
+    showBanner(main, sub, seconds = 4) {
+      elements.bannerMain.textContent = main;
+      elements.bannerSub.textContent = sub;
+      elements.banner.hidden = false;
+      bannerTimer = seconds;
+    },
+    hideBanner() {
+      elements.banner.hidden = true;
+      bannerTimer = 0;
+    },
+    /** Advance the banner timer; hide it when it runs out. */
+    tickBanner(dt) {
+      if (bannerTimer > 0) {
+        bannerTimer -= dt;
+        if (bannerTimer <= 0) elements.banner.hidden = true;
+      }
     },
     setHealth(value) {
       const clamped = Math.max(0, Math.min(100, Math.round(value)));
@@ -105,8 +141,20 @@ export function createHud() {
       ctx.lineWidth = 5;
       ctx.beginPath(); ctx.moveTo(pier.x + 14 * MAP_SCALE, pier.y); ctx.lineTo(pier.x - 52 * MAP_SCALE, pier.y); ctx.stroke();
       // Traffic dots.
+      const flashRed = Math.floor(performance.now() / 350) % 2 === 0;
       for (const dot of dots) {
         const p = worldToMap(dot.x, dot.z);
+        if (dot.kind === 'police') {
+          // Police flash red/blue on the minimap, bigger than traffic.
+          ctx.fillStyle = flashRed ? '#ff3b30' : '#3b82ff';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          continue;
+        }
         ctx.fillStyle = dot.kind === 'car' ? '#ffd166' : 'rgba(255,255,255,0.7)';
         ctx.beginPath();
         ctx.arc(p.x, p.y, dot.kind === 'car' ? 2.5 : 1.5, 0, Math.PI * 2);

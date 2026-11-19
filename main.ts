@@ -1,6 +1,7 @@
 // Vice Shores (gta6-01): a three.js open-world crime game — a procedural low-poly
-// sunset city to walk and (soon) drive, with traffic, pedestrians, a wanted level,
-// missions, a HUD with a minimap, a start screen and localStorage saves. The game
+// sunset city to walk and drive, with traffic, pedestrians, cars to steal, a wanted
+// level and police who chase you, missions, a HUD with a minimap, a start screen
+// and localStorage saves. The game
 // is this directory's game/ folder, plain static files a desktop browser loads
 // offline (game/index.html and its ES modules, three.js vendored under game/vendor/,
 // no network request), and the program hands it in. It copies game/ and

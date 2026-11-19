@@ -61,6 +61,47 @@ export const VEHICLE = {
   stealDistance: 3.6,
 };
 
+/** The Vice Shores PD: how many units answer each wanted star, how fast they
+ *  chase, how close they must stay to make an arrest, and how long out of sight
+ *  it takes for the heat to cool. */
+export const POLICE = {
+  /** Most patrol cars on the streets at once (one per star, up to this). */
+  maxCars: 4,
+  /** How far from the player a fresh patrol car appears. */
+  spawnDistance: 50,
+  /** A patrol car farther than this from the player is pulled off the chase. */
+  despawnDistance: 130,
+  /** Inside this distance a unit has eyes on the player; outside it, she is hiding. */
+  sightDistance: 55,
+  /** Chase speed at wanted 1, plus this per extra star. */
+  chaseSpeed: 26,
+  chaseSpeedPerStar: 1.6,
+  /** How fast a patrol car turns toward the player, radians per second. */
+  turnRate: 2.4,
+  /** A patrol car this close is ramming the player. */
+  ramDistance: 3.9,
+  /** Ramming a patrol car above this speed (mph) raises the wanted level. */
+  ramSpeed: 12,
+  /** Seconds before another ram can raise the wanted level again. */
+  ramCooldown: 5,
+  /** A patrol car this close can make the arrest (player in a car). */
+  bustDistance: 4.5,
+  /** A foot cop this close can make the arrest (player on foot). */
+  bustFootDistance: 2.6,
+  /** The player must be slower than this (mph) to be busted. */
+  bustSpeed: 3,
+  /** Seconds a unit must stay close to a slow player before the bust. */
+  bustSeconds: 3,
+  /** Seconds unseen before the wanted level drops by one star. */
+  evadeSeconds: 8,
+  /** Foot-cop running speed: a touch slower than Marisol's sprint. */
+  copSpeed: 9.5,
+  /** Most foot cops on the streets at once. */
+  maxCops: 2,
+  /** Wanted level at which foot cops join the chase. */
+  copWanted: 3,
+};
+
 export const CLOCK = {
   /** In-game minutes that pass per real second while playing. */
   minutesPerSecond: 1,

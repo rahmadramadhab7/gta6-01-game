@@ -10,6 +10,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a2233; }
 #hud-top-right { position: absolute; top: 14px; right: 16px; text-align: right; }
 #wanted { font-size: 26px; letter-spacing: 4px; color: #ffd166; }
 #wanted .lit { color: #ff5a4e; }
+#wanted-state { margin-top: 2px; font-size: 13px; font-weight: 800; letter-spacing: 3px; min-height: 16px; }
+#wanted-state.state-wanted { color: #ff5a4e; }
+#wanted-state.state-evading { color: #ffd166; animation: evade-blink 0.9s steps(2, start) infinite; }
+@keyframes evade-blink { 50% { opacity: 0.25; } }
+#banner { position: absolute; top: 32%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+#banner[hidden] { display: none; }
+#banner-main { font-size: 64px; font-weight: 900; letter-spacing: 14px; color: #ff5a4e; text-shadow: 0 0 24px rgba(255, 60, 40, .8), 0 2px 6px rgba(0,0,0,.9); }
+#banner-sub { margin-top: 6px; font-size: 17px; font-weight: 600; color: #f5efe4; }
 #health-wrap { margin-top: 6px; width: 180px; height: 16px; background: rgba(10, 14, 26, .6); border-radius: 8px; overflow: hidden; position: relative; margin-left: auto; }
 #health-bar { height: 100%; width: 100%; background: linear-gradient(90deg, #ff7a59, #ffb454); }
 #health-text { position: absolute; inset: 0; text-align: center; font-size: 11px; line-height: 16px; font-weight: 700; }
