@@ -144,6 +144,20 @@ export function createHud() {
       const flashRed = Math.floor(performance.now() / 350) % 2 === 0;
       for (const dot of dots) {
         const p = worldToMap(dot.x, dot.z);
+        if (dot.kind === 'mission') {
+          // The active mission marker: a pulsing gold diamond, bigger than traffic.
+          const pulse = 4 + Math.sin(performance.now() / 250) * 1.2;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(Math.PI / 4);
+          ctx.fillStyle = '#ffd166';
+          ctx.fillRect(-pulse / 2, -pulse / 2, pulse, pulse);
+          ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(-pulse / 2, -pulse / 2, pulse, pulse);
+          ctx.restore();
+          continue;
+        }
         if (dot.kind === 'police') {
           // Police flash red/blue on the minimap, bigger than traffic.
           ctx.fillStyle = flashRed ? '#ff3b30' : '#3b82ff';

@@ -81,7 +81,42 @@ export function createVehicles(scene, seed) {
       speed: 0, stolen: false,
     });
   });
-  return { parked, driven: null };
+  return { scene, parked, driven: null, missionCar: null };
+}
+
+/** Spawn the mission getaway car (M5): a tuned Sunset Comet parked by the vault,
+ *  faster than a street car, waiting to be stolen for the run to the pier. */
+export function spawnMissionCar(vehicles, x, z, heading = 0) {
+  if (vehicles.missionCar) return vehicles.missionCar;
+  const color = 0xc0392b;
+  const mesh = makeCar(color);
+  mesh.position.set(x, 0, z);
+  mesh.rotation.y = heading;
+  vehicles.scene.add(mesh);
+  const car = {
+    mesh, color,
+    name: 'Getaway Comet',
+    x, z, heading,
+    homeX: x, homeZ: z, homeHeading: heading,
+    speed: 0, stolen: true, // Rico's car: taking it is part of the job, not a fresh theft.
+    /** A tuned engine: 25% higher top speed than a street car. */
+    boost: 1.25,
+    missionCar: true,
+  };
+  vehicles.parked.push(car);
+  vehicles.missionCar = car;
+  return car;
+}
+
+/** Take the mission getaway car off the streets. */
+export function removeMissionCar(vehicles) {
+  const car = vehicles.missionCar;
+  if (!car) return;
+  const index = vehicles.parked.indexOf(car);
+  if (index >= 0) vehicles.parked.splice(index, 1);
+  if (vehicles.driven && vehicles.driven.ref === car) vehicles.driven = null;
+  vehicles.scene.remove(car.mesh);
+  vehicles.missionCar = null;
 }
 
 /** The nearest car Marisol can steal: a parked car, or a traffic car rolling past. */
@@ -169,7 +204,7 @@ export function stepVehicle(vehicles, input, colliders, traffic, dt) {
     if (Math.abs(car.speed) <= drag) car.speed = 0;
     else car.speed -= Math.sign(car.speed) * drag;
   }
-  car.speed = Math.max(-VEHICLE.maxReverse, Math.min(VEHICLE.maxSpeed, car.speed));
+  car.speed = Math.max(-VEHICLE.maxReverse, Math.min(VEHICLE.maxSpeed * (car.boost || 1), car.speed));
   // Steering follows the speed: full lock at full speed, reversed while reversing.
   const steer = right - left;
   const speedFactor = Math.max(-1, Math.min(1, car.speed / VEHICLE.maxSpeed));
@@ -204,6 +239,7 @@ export function stepVehicle(vehicles, input, colliders, traffic, dt) {
 
 /** Put every parked car back on its kerb spot and clear the driven car. */
 export function resetVehicles(vehicles) {
+  removeMissionCar(vehicles);
   for (const car of vehicles.parked) {
     car.x = car.homeX;
     car.z = car.homeZ;
@@ -225,6 +261,16 @@ export function vehicleDots(vehicles) {
 export function parkedSpot(vehicles, index) {
   const car = vehicles.parked[index % vehicles.parked.length];
   return { x: car.x, z: car.z, heading: car.heading, name: car.name };
+}
+
+/** Move a parked car to a spot (used to stage the mission screenshot near the safehouse). */
+export function moveParkedCar(vehicles, index, x, z, heading) {
+  const car = vehicles.parked[index % vehicles.parked.length];
+  car.x = x; car.z = z; car.heading = heading;
+  car.homeX = x; car.homeZ = z; car.homeHeading = heading;
+  car.mesh.position.set(x, 0, z);
+  car.mesh.rotation.y = heading;
+  return car;
 }
 
 /** What the save file needs to remember about the cars. */

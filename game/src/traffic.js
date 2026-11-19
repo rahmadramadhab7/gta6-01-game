@@ -96,11 +96,55 @@ export function createTraffic(scene, seed) {
       pause: 0,
     });
   }
-  return { cars, pedestrians };
+  return { scene, cars, pedestrians, target: null };
+}
+
+/** Spawn the mission tail target (M3): a gold Coral Coupe looping the 69-block. */
+export function spawnMissionTarget(traffic, x, z) {
+  if (traffic.target) return traffic.target;
+  const mesh = makeCar(0xf1c40f);
+  mesh.position.set(x, 0, z);
+  traffic.scene.add(mesh);
+  const route = [
+    { x: 69, z: 69 }, { x: -69, z: 69 }, { x: -69, z: -69 }, { x: 69, z: -69 },
+  ];
+  traffic.target = { mesh, route, wp: 0, speed: 12, x, z, heading: 0, missionTarget: true };
+  return traffic.target;
+}
+
+/** Take the mission tail target off the streets. */
+export function removeMissionTarget(traffic) {
+  if (!traffic.target) return;
+  traffic.scene.remove(traffic.target.mesh);
+  traffic.target = null;
+}
+
+/** Where the tail target is, for the mission logic; null when there is none. */
+export function missionTargetPosition(traffic) {
+  return traffic.target ? { x: traffic.target.x, z: traffic.target.z } : null;
 }
 
 /** One fixed step: cars cruise their lane and wrap at the city edge; walkers stroll and pause. */
 export function stepTraffic(traffic, dt) {
+  // The mission tail target (M3) does not cruise a lane: it loops the 69-block,
+  // waypoint to waypoint, so the player can follow it around the city.
+  if (traffic.target) {
+    const target = traffic.target;
+    const wp = target.route[target.wp];
+    const dx = wp.x - target.x;
+    const dz = wp.z - target.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < 3) {
+      target.wp = (target.wp + 1) % target.route.length;
+    } else {
+      const heading = Math.atan2(dx, dz);
+      target.heading = heading;
+      target.x += Math.sin(heading) * target.speed * dt;
+      target.z += Math.cos(heading) * target.speed * dt;
+      target.mesh.position.set(target.x, 0, target.z);
+      target.mesh.rotation.y = heading;
+    }
+  }
   for (const car of traffic.cars) {
     car.at += car.direction * car.speed * dt;
     if (car.at > CITY.halfExtent + 10) car.at = -CITY.halfExtent - 10;
@@ -130,9 +174,10 @@ export function stepTraffic(traffic, dt) {
   }
 }
 
-/** Positions for the minimap: cars as dots, pedestrians as fainter dots. */
+/** Positions for the minimap: cars as dots, pedestrians as fainter dots, the mission tail target as a gold diamond. */
 export function trafficDots(traffic) {
   const dots = [];
+  if (traffic.target) dots.push({ x: traffic.target.x, z: traffic.target.z, kind: 'mission' });
   for (const car of traffic.cars) dots.push({ x: car.mesh.position.x, z: car.mesh.position.z, kind: 'car' });
   for (const ped of traffic.pedestrians) dots.push({ x: ped.mesh.position.x, z: ped.mesh.position.z, kind: 'ped' });
   return dots;

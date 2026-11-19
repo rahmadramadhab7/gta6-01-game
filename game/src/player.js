@@ -38,7 +38,16 @@ function buildCharacter() {
   const rightLeg = leftLeg.clone();
   rightLeg.position.x = 0.16;
   group.add(rightLeg);
-  group.userData = { leftArm, rightArm, leftLeg, rightLeg };
+  // The job package: a small crate strapped to the back, shown while Marisol
+  // carries a delivery (M2) or the heist lockbox (M5).
+  const crate = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.4, 0.3),
+    new THREE.MeshStandardMaterial({ color: 0x8a6b3f, roughness: 0.9 }),
+  );
+  crate.position.set(0, 1.25, -0.42);
+  crate.visible = false;
+  group.add(crate);
+  group.userData = { leftArm, rightArm, leftLeg, rightLeg, crate };
   return group;
 }
 
@@ -131,6 +140,12 @@ export function stepPlayer(state, input, colliders, dt = STEP) {
   parts.rightArm.rotation.x = -swing;
   parts.leftLeg.rotation.x = -swing;
   parts.rightLeg.rotation.x = swing;
+}
+
+/** Show or hide the job package on Marisol's back (M2 delivery, M5 lockbox). */
+export function setCarrying(state, carrying) {
+  state.group.userData.crate.visible = !!carrying;
+  state.carrying = !!carrying;
 }
 
 /** Chase camera: behind the player at the orbit yaw, looking slightly down at them. */

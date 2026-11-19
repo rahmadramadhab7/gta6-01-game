@@ -29,7 +29,7 @@
   <div id="hud-bottom-left">
     <div id="clock">Day 1 · 17:42</div>
     <div id="speed">0 mph · on foot</div>
-    <div id="hint">WASD move · Shift run · E steal / exit car · drag mouse to look · M mute · P pause</div>
+    <div id="hint">WASD move · Shift run · E steal / exit car · drag mouse to look · J missions · R retry mission · M mute · P pause</div>
   </div>
   <canvas id="minimap" width="180" height="180" aria-label="Minimap of Vice Shores"></canvas>
   <div id="banner" hidden><div id="banner-main"></div><div id="banner-sub"></div></div>
@@ -49,9 +49,23 @@
       <button id="btn-continue" disabled>Continue</button>
     </div>
     <p id="controls">WASD / arrows — walk &amp; drive &nbsp;·&nbsp; Shift — run &nbsp;·&nbsp; E — steal a car / get out
-    &nbsp;·&nbsp; Mouse drag — look &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; M — mute</p>
+    &nbsp;·&nbsp; Mouse drag — look &nbsp;·&nbsp; J — missions &nbsp;·&nbsp; R — retry mission &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; M — mute</p>
     <p id="start-foot">An original open-world crime game. No real city, no real people,
     no borrowed assets — every street of Vice Shores was built for this game.</p>
+  </div>
+</div>
+
+<div id="mission-panel" hidden>
+  <div id="mission-card">
+    <h2>MISSIONS — VICE SHORES</h2>
+    <p id="mission-story"></p>
+    <ol id="mission-list"></ol>
+    <div id="mission-buttons">
+      <button id="btn-mission-start">Start mission</button>
+      <button id="btn-mission-restart">Retry mission (R)</button>
+      <button id="btn-mission-close">Close (J)</button>
+    </div>
+    <p id="mission-foot">Five jobs, in order. A mission fails if you are BUSTED, run out of time, or lose the tail — retry it as often as it takes.</p>
   </div>
 </div>
 

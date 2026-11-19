@@ -69,6 +69,18 @@ export function createAudio() {
     isMuted() { return muted; },
     click() { blip(660, 0.08, 'sine', 0.12); },
     chime() { blip(880, 0.25, 'sine', 0.15); blip(1320, 0.3, 'sine', 0.1); },
+    /** A mission done: a rising four-note jingle, one note every 110 ms. */
+    missionComplete() {
+      [523.25, 659.25, 783.99, 1046.5].forEach((frequency, i) => {
+        window.setTimeout(() => blip(frequency, 0.22, 'triangle', 0.16), i * 110);
+      });
+    },
+    /** A mission failed: two low notes stepping down. */
+    missionFail() {
+      [330, 261.63, 196].forEach((frequency, i) => {
+        window.setTimeout(() => blip(frequency, 0.3, 'sawtooth', 0.08), i * 160);
+      });
+    },
     /** Footsteps while moving: a soft tap every half stride. */
     stepFootsteps(moving, running) {
       if (!moving || !context || muted) return;

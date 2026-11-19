@@ -15,6 +15,9 @@ export function defaultSave() {
     minutes: 17 * 60 + 42,
     objective: START.objective,
     vehicles: null,
+    /** Mission progress: the next mission to play, and the ones already done. */
+    missionIndex: 0,
+    missionsDone: [],
   };
 }
 

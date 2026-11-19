@@ -2,20 +2,21 @@
 // in fixed 1/60 s steps (several in a slow frame, none in a fast one), and the renderer
 // paints what is there. The game moves between three screens: title, play and paused.
 //
-// ?seed=N fixes the city and the traffic. ?shot=play|street|pier|drive|police|start
+// ?seed=N fixes the city and the traffic. ?shot=play|street|pier|drive|police|mission|start
 // (with &seed=N) stages that scene instead of running the loop, paints it twice and
 // sets window.__shotReady for a screenshot.
 import * as THREE from 'three';
 import { CAMERA, CLOCK, START, STEP } from './config.js';
 import { createCity } from './city.js';
-import { createPlayer, snapCamera, stepPlayer, updateCamera } from './player.js';
-import { createTraffic, stepTraffic, trafficDots } from './traffic.js';
-import { createVehicles, enterCar, exitCar, parkedSpot, resetVehicles, restoreVehicles, serializeVehicles, stepVehicle, vehicleDots } from './vehicle.js';
+import { createPlayer, setCarrying as setPlayerCarrying, snapCamera, stepPlayer, updateCamera } from './player.js';
+import { createTraffic, missionTargetPosition, removeMissionTarget, spawnMissionTarget, stepTraffic, trafficDots } from './traffic.js';
+import { createVehicles, enterCar, exitCar, moveParkedCar, parkedSpot, removeMissionCar, resetVehicles, restoreVehicles, serializeVehicles, spawnMissionCar, stepVehicle, vehicleDots } from './vehicle.js';
 import { clearPolice, createPolice, policeDots, stageChase, stepPolice } from './police.js';
 import { createHud } from './hud.js';
 import { createAudio } from './audio.js';
-import { ACTION_ENTER, ACTION_MUTE, ACTION_PAUSE, createInput } from './input.js';
+import { ACTION_ENTER, ACTION_MISSION, ACTION_MUTE, ACTION_PAUSE, ACTION_RESTART, createInput } from './input.js';
 import { clearSave, defaultSave, hasSave, loadSave, writeSave } from './save.js';
+import { createMissions } from './mission.js';
 import { stageShot } from './shots.js';
 
 /** The longest frame the loop catches up on; a longer stall (a hidden tab) is dropped, not replayed. */
@@ -35,6 +36,10 @@ const pauseScreen = document.getElementById('pause-screen');
 const btnNew = document.getElementById('btn-new');
 const btnContinue = document.getElementById('btn-continue');
 const btnResume = document.getElementById('btn-resume');
+const missionPanel = document.getElementById('mission-panel');
+const btnMissionStart = document.getElementById('btn-mission-start');
+const btnMissionRestart = document.getElementById('btn-mission-restart');
+const btnMissionClose = document.getElementById('btn-mission-close');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -56,6 +61,15 @@ const police = createPolice(scene, seed);
 const hud = createHud();
 const audio = createAudio();
 const input = createInput(canvas);
+const missions = createMissions(scene, {
+  traffic, vehicles, player,
+  spawnTargetCar: () => spawnMissionTarget(traffic, 69, 69),
+  removeTargetCar: () => removeMissionTarget(traffic),
+  spawnGetawayCar: () => spawnMissionCar(vehicles, 52, -23, Math.PI / 2),
+  removeGetawayCar: () => removeMissionCar(vehicles),
+  setCarrying: (carrying) => setPlayerCarrying(player, carrying),
+  targetPosition: () => missionTargetPosition(traffic),
+});
 
 const state = {
   screen: 'title',
@@ -90,6 +104,7 @@ const game = {
     wantedMode = 'clear';
     clearPolice(police);
     resetVehicles(vehicles);
+    missions.resetRun();
     player.group.visible = true;
     player.x = START.spawn.x;
     player.z = START.spawn.z;
@@ -118,6 +133,14 @@ const game = {
   /** Where parked car `index` waits, for the driving screenshot. */
   parkedSpot(index) {
     return parkedSpot(vehicles, index);
+  },
+  /** Move a parked car to a spot (used to stage the mission screenshot). */
+  moveParkedCar(index, x, z, heading) {
+    return moveParkedCar(vehicles, index, x, z, heading);
+  },
+  /** Start mission `index` (used to stage the mission screenshot). */
+  startMission(index) {
+    applyMissionEvents(missions.start(index));
   },
   /** Steal the nearest car (or climb out, if already driving) and report it. */
   enterCar() {
@@ -167,7 +190,8 @@ const game = {
       hud.tickToast(dt);
       hud.tickBanner(dt);
       stepWanted(dt);
-      hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles), ...policeDots(police)]);
+      stepMissions(dt);
+      hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles), ...policeDots(police), ...missions.dots()]);
       return;
     }
     stepPlayer(player, move, city.colliders, dt);
@@ -183,7 +207,8 @@ const game = {
     hud.tickToast(dt);
     hud.tickBanner(dt);
     stepWanted(dt);
-    hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles), ...policeDots(police)]);
+    stepMissions(dt);
+    hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles), ...policeDots(police), ...missions.dots()]);
     audio.stepFootsteps(player.moving, player.speed > 8);
   },
   render() {
@@ -250,6 +275,50 @@ function stepWanted(dt) {
   if (result.busted) applyBusted();
 }
 
+/** Apply what a mission step reported: toasts, wanted changes, rewards, failures. */
+function applyMissionEvents(events) {
+  for (const event of events) {
+    if (event.type === 'toast') hud.showToast(event.text, event.seconds || 4);
+    else if (event.type === 'wanted') {
+      state.wanted = event.level;
+      hud.setWanted(state.wanted);
+      if (state.wanted === 0) {
+        wantedMode = 'clear';
+        hud.setWantedState('clear');
+      }
+    } else if (event.type === 'clearPolice') clearPolice(police);
+    else if (event.type === 'complete') {
+      state.cash += event.mission.reward;
+      hud.setCash(state.cash);
+      audio.missionComplete();
+      hud.showBanner('MISSION COMPLETE', event.text, 4);
+      writeSave(snapshotSave());
+    } else if (event.type === 'fail') {
+      audio.missionFail();
+      hud.showBanner('MISSION FAILED', event.text, 4);
+      writeSave(snapshotSave());
+    } else if (event.type === 'next') {
+      // The chain advances on its own: the next job starts with its briefing.
+      applyMissionEvents(missions.start(missions.state.index));
+    }
+  }
+}
+
+/** One mission step inside the game loop, plus the live objective line. */
+function stepMissions(dt) {
+  const world = {
+    x: player.x,
+    z: player.z,
+    driving: !!state.driving,
+    speed: state.driving ? Math.abs(state.driving.speed) : player.speed,
+    wanted: state.wanted,
+  };
+  applyMissionEvents(missions.step(dt, world));
+  if (missions.state.status === 'active' || missions.state.status === 'failed' || missions.state.status === 'complete') {
+    hud.setObjective(missions.objectiveText(world));
+  }
+}
+
 /** Busted: the Vice Shores PD takes a cut of the cash, the heat resets, and
  *  Marisol is dropped back at the precinct steps on foot. */
 function applyBusted() {
@@ -282,6 +351,8 @@ function applyBusted() {
     4,
   );
   hud.showToast('Busted — back at the precinct steps', 4);
+  // A bust blows the active mission too.
+  applyMissionEvents(missions.fail('busted'));
   writeSave(snapshotSave());
 }
 
@@ -297,6 +368,8 @@ function snapshotSave() {
     minutes: state.minutes,
     objective: state.objective,
     vehicles: serializeVehicles(vehicles),
+    missionIndex: missions.state.index,
+    missionsDone: [...missions.state.done],
   };
 }
 
@@ -312,6 +385,7 @@ function applySave(save) {
   state.day = save.day;
   state.minutes = save.minutes;
   state.objective = save.objective;
+  missions.restore(save.missionIndex, save.missionsDone);
   player.x = save.x;
   player.z = save.z;
   player.heading = save.heading;
@@ -344,6 +418,11 @@ function startPlaying(fresh) {
   if (fresh) {
     clearSave();
     game.reset();
+    missions.resetAll();
+    applyMissionEvents(missions.start(0));
+  } else if (missions.state.status !== 'active' && missions.state.index < missions.MISSIONS.length) {
+    // Continue: pick up the next job in the chain.
+    applyMissionEvents(missions.start(missions.state.index));
   }
   state.screen = 'play';
   startScreen.hidden = true;
@@ -400,6 +479,19 @@ function runGame() {
     startPlaying(false);
   });
   btnResume.addEventListener('click', resumeGame);
+  btnMissionStart.addEventListener('click', () => {
+    if (missions.state.status !== 'active' && missions.state.index < missions.MISSIONS.length) {
+      applyMissionEvents(missions.start(missions.state.index));
+    }
+    missionPanel.hidden = true;
+  });
+  btnMissionRestart.addEventListener('click', () => {
+    if (missions.state.status === 'active' || missions.state.status === 'failed') {
+      applyMissionEvents(missions.restart());
+    }
+    missionPanel.hidden = true;
+  });
+  btnMissionClose.addEventListener('click', () => { missionPanel.hidden = true; });
   window.addEventListener('keydown', (event) => {
     if (event.code === 'Enter' && state.screen === 'title') startPlaying(true);
   });
@@ -418,6 +510,17 @@ function runGame() {
     }
     if (actions & ACTION_ENTER) {
       if (state.screen === 'play') tryEnterCar();
+    }
+    if (actions & ACTION_MISSION) {
+      if (state.screen === 'play') {
+        missionPanel.hidden = !missionPanel.hidden;
+        if (!missionPanel.hidden) missions.renderPanel();
+      }
+    }
+    if (actions & ACTION_RESTART) {
+      if (state.screen === 'play' && (missions.state.status === 'active' || missions.state.status === 'failed')) {
+        applyMissionEvents(missions.restart());
+      }
     }
     if (actions & ACTION_PAUSE) {
       if (state.screen === 'play') pauseGame();

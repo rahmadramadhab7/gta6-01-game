@@ -5,6 +5,8 @@
 export const ACTION_PAUSE = 1;
 export const ACTION_MUTE = 2;
 export const ACTION_ENTER = 4;
+export const ACTION_MISSION = 8;
+export const ACTION_RESTART = 16;
 
 export function createInput(canvas) {
   const keys = new Set();
@@ -21,6 +23,8 @@ export function createInput(canvas) {
     if (event.code === 'KeyP' || event.code === 'Escape') actions |= ACTION_PAUSE;
     if (event.code === 'KeyM') actions |= ACTION_MUTE;
     if (event.code === 'KeyE') actions |= ACTION_ENTER;
+    if (event.code === 'KeyJ') actions |= ACTION_MISSION;
+    if (event.code === 'KeyR') actions |= ACTION_RESTART;
   }
   function keyUp(event) {
     keys.delete(event.code);

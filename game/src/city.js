@@ -284,6 +284,43 @@ function buildProps(scene, random) {
   return colliders;
 }
 
+/** The mission landmarks: Dahlia's beach safehouse (M4) and the pier drop crates (M5).
+ *  Both sit on open ground, clear of buildings and traffic, so a marker can point at them. */
+export function buildMissionLandmarks(scene) {
+  // Safehouse: a small teal hut on the sand's edge with a warm lamp in the window.
+  const hutMat = new THREE.MeshStandardMaterial({ color: 0x3f7d6e, roughness: 0.9 });
+  const hut = new THREE.Mesh(new THREE.BoxGeometry(6, 3.2, 5), hutMat);
+  hut.position.set(-140, 1.6, -69);
+  hut.castShadow = true;
+  scene.add(hut);
+  const hutRoof = new THREE.Mesh(
+    new THREE.ConeGeometry(4.8, 1.8, 4),
+    new THREE.MeshStandardMaterial({ color: 0xc46b5d, roughness: 0.9 }),
+  );
+  hutRoof.position.set(-140, 4.1, -69);
+  hutRoof.rotation.y = Math.PI / 4;
+  hutRoof.castShadow = true;
+  scene.add(hutRoof);
+  const lamp = new THREE.Mesh(
+    new THREE.SphereGeometry(0.3, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffd9a0 }),
+  );
+  lamp.position.set(-137, 2, -69);
+  scene.add(lamp);
+  // Pier drop: two crates waiting at the pier's foot for the heist lockbox.
+  const crateMat = new THREE.MeshStandardMaterial({ color: 0x8a6b3f, roughness: 1 });
+  for (const [x, z, s] of [[-104, 20, 1.2], [-102, 23.5, 0.9]]) {
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), crateMat);
+    crate.position.set(x, s / 2, z);
+    crate.castShadow = true;
+    scene.add(crate);
+  }
+  return {
+    safehouse: { x: -140, z: -69 },
+    pierDrop: { x: -104, z: 23 },
+  };
+}
+
 /** Build the whole city into a scene and return its collision boxes. */
 export function createCity(scene, seed) {
   const random = createRandom(seed);
@@ -307,5 +344,6 @@ export function createCity(scene, seed) {
   buildStreets(scene);
   buildBeach(scene);
   const colliders = buildProps(scene, random);
-  return { colliders };
+  const landmarks = buildMissionLandmarks(scene);
+  return { colliders, landmarks };
 }

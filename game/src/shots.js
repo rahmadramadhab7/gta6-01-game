@@ -38,10 +38,32 @@ function driveForward(game, seconds) {
  *    speed and wanted stars on the HUD.
  *  - police: the chase — a stolen car at three stars with two patrol cars on its
  *    tail, lights flashing, WANTED on the HUD and police dots on the minimap.
+ *  - mission: Heat Escape in progress — a stolen car at three stars racing for
+ *    the beach safehouse, two patrol cars on its tail, the safehouse beacon and
+ *    the mission objective on the HUD.
  *  - start (or anything else): the title screen over the city at dusk.
  */
 export function stageShot(name, game) {
   game.reset();
+  if (name === 'mission') {
+    // Heat Escape (M4) mid-run: move a parked car to the west avenue, steal it,
+    // and race it toward the beach safehouse at three stars with two patrol cars
+    // on the tail — the safehouse beacon, the objective and the chase all in frame.
+    game.moveParkedCar(0, -92, -69, -Math.PI / 2);
+    const spot = game.parkedSpot(0);
+    game.placePlayer(spot.x + 2.5, spot.z, spot.heading);
+    game.enterCar();
+    game.startMission(3);
+    game.state.driving.heading = -Math.PI / 2;
+    game.setCameraDistance(16);
+    game.setCameraYaw(Math.PI / 2);
+    driveForward(game, 1);
+    game.spawnPoliceChase(2, 30);
+    driveForward(game, 0.5);
+    game.hud.showToast('Wanted ★★★ — reach the beach safehouse', 60);
+    game.showHud();
+    return { screen: 'play' };
+  }
   if (name === 'police') {
     // Steal the first parked car, run it west down Marina Avenue at three stars,
     // then put two patrol cars on its tail and keep driving — the frame is a real
