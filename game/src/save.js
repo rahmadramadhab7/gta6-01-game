@@ -18,6 +18,9 @@ export function defaultSave() {
     /** Mission progress: the next mission to play, and the ones already done. */
     missionIndex: 0,
     missionsDone: [],
+    /** Side activities: collected Shore Coin indices, jumped ramp indices. */
+    coins: [],
+    stunts: [],
   };
 }
 

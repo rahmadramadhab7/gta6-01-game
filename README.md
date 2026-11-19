@@ -24,8 +24,14 @@ pedestrians, a HUD (cash, wanted stars, health, clock, speed, objective) with
 a live minimap, a start screen with New Game / Continue, localStorage saves,
 synthesised WebAudio sound, and deterministic `?shot=` staging for screenshots.
 
-Coming next: stealing and driving cars, police and the wanted system, missions
-and story beats, combat and side activities.
+Night 2 added stealing and driving cars; Night 3 the police and the wanted
+system (chases, foot cops, evasion, BUSTED); Night 4 a five-mission story
+chain with Marisol, Rico and the Marina Pier meet; Night 5 melee combat
+(punch, witnesses, WASTED), side activities (12 Shore Coins, 3 stunt ramps),
+and synthesised engine, siren, punch, coin and stunt sounds (M to mute).
+
+Coming next: polish — tighter combat feel, more activity variety, and a
+final screenshot pass before the 22 Nov submit.
 
 ## Controls
 
@@ -33,6 +39,10 @@ and story beats, combat and side activities.
 | --- | --- |
 | W / A / S / D or arrows | Walk (camera-relative) |
 | Shift | Run |
+| E | Steal a car / get out |
+| F or mouse click | Punch (on foot) |
+| J | Missions panel |
+| R | Retry mission |
 | Mouse drag | Look / orbit camera |
 | P or Esc | Pause (autosaves) |
 | M | Mute |
@@ -78,14 +88,19 @@ game/
     hud.js              HUD widgets + 2D minimap
     minimap             (drawn by hud.js)
     save.js             localStorage save / load
-    audio.js            WebAudio synth: pad, footsteps, chimes
+    audio.js            WebAudio synth: pad, footsteps, chimes, engine, siren
+    combat.js           melee punches, witnesses, fleeing pedestrians, WASTED
+    activity.js         Shore Coins (12) and stunt ramps (3)
+    vehicle.js          stealing and arcade driving
+    police.js           patrol-car chases, foot cops, evasion, BUSTED
+    mission.js          five-mission story chain
     shots.js            deterministic ?shot= staging
     input.js            keyboard + pointer-drag input
     random.js           seeded RNG
 main.ts                 entry program (copies game/ + screenshots/, writes dossier.json)
 serve.ts                tiny static server for local play
 shots.json              staged screenshot scenes
-screenshots/            1-start.jpg (cover), 2-play.jpg, 3-end.jpg
+screenshots/            4-drive.png (cover), 5-police.png, 6-mission.png, 7-combat.jpg
 ```
 
 ## License

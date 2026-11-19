@@ -2,7 +2,7 @@
 // in fixed 1/60 s steps (several in a slow frame, none in a fast one), and the renderer
 // paints what is there. The game moves between three screens: title, play and paused.
 //
-// ?seed=N fixes the city and the traffic. ?shot=play|street|pier|drive|police|mission|start
+// ?seed=N fixes the city and the traffic. ?shot=play|street|pier|drive|police|mission|combat|activity|start
 // (with &seed=N) stages that scene instead of running the loop, paints it twice and
 // sets window.__shotReady for a screenshot.
 import * as THREE from 'three';
@@ -14,9 +14,11 @@ import { createVehicles, enterCar, exitCar, moveParkedCar, parkedSpot, removeMis
 import { clearPolice, createPolice, policeDots, stageChase, stepPolice } from './police.js';
 import { createHud } from './hud.js';
 import { createAudio } from './audio.js';
-import { ACTION_ENTER, ACTION_MISSION, ACTION_MUTE, ACTION_PAUSE, ACTION_RESTART, createInput } from './input.js';
+import { ACTION_ATTACK, ACTION_ENTER, ACTION_MISSION, ACTION_MUTE, ACTION_PAUSE, ACTION_RESTART, createInput } from './input.js';
 import { clearSave, defaultSave, hasSave, loadSave, writeSave } from './save.js';
 import { createMissions } from './mission.js';
+import { createCombat, stepCombat, tryPunch, wastedFine } from './combat.js';
+import { COIN_BONUS, COIN_REWARD, STUNT_REWARD, activityDots, coinsCollected, createActivities, moveCoin, resetActivities, restoreActivities, serializeActivities, stepActivities } from './activity.js';
 import { stageShot } from './shots.js';
 
 /** The longest frame the loop catches up on; a longer stall (a hidden tab) is dropped, not replayed. */
@@ -58,6 +60,8 @@ const player = createPlayer(scene, START.spawn);
 const traffic = createTraffic(scene, seed);
 const vehicles = createVehicles(scene, seed);
 const police = createPolice(scene, seed);
+const combat = createCombat(scene);
+const activities = createActivities(scene, seed);
 const hud = createHud();
 const audio = createAudio();
 const input = createInput(canvas);
@@ -104,6 +108,9 @@ const game = {
     wantedMode = 'clear';
     clearPolice(police);
     resetVehicles(vehicles);
+    resetActivities(activities);
+    combat.cooldown = 0;
+    combat.punchTimer = 0;
     missions.resetRun();
     player.group.visible = true;
     player.x = START.spawn.x;
@@ -116,6 +123,7 @@ const game = {
     hud.setHealth(state.health);
     hud.setWanted(state.wanted);
     hud.setWantedState('clear');
+    hud.setCoins(0);
     hud.hideBanner();
     hud.setObjective(state.objective);
     hud.setClock(state.day, state.minutes);
@@ -149,6 +157,59 @@ const game = {
   /** Put `count` patrol cars on Marisol's tail, for the police screenshot. */
   spawnPoliceChase(count, speed) {
     stageChase(police, player.x, player.z, player.heading, count, speed);
+  },
+  /** Throw a punch (F / click): hit, sound, and the wanted cost of being seen. */
+  punch() {
+    const result = tryPunch(combat, player, traffic, police);
+    if (!result) return null;
+    if (result.hit) {
+      audio.punch();
+      if (result.witnessed && state.wanted < 5) {
+        state.wanted = Math.min(5, state.wanted + 1);
+        hud.setWanted(state.wanted);
+        hud.showToast('Someone saw that — wanted level up', 3);
+      }
+    }
+    return result;
+  },
+  /** Stage the combat screenshot: drag the nearest pedestrian into punch range,
+   *  land the hit, and put the heat on at one star with a patrol car in frame. */
+  stageCombatHit() {
+    let nearest = null;
+    let bestDist = Infinity;
+    for (const ped of traffic.pedestrians) {
+      const dist = Math.hypot(ped.mesh.position.x - player.x, ped.mesh.position.z - player.z);
+      if (dist < bestDist) { bestDist = dist; nearest = ped; }
+    }
+    if (nearest) {
+      // In front of Marisol and a step to her left, so the hit reads in frame
+      // instead of hiding behind her back — still inside punch range and cone.
+      const fx = Math.sin(player.heading);
+      const fz = Math.cos(player.heading);
+      const sx = Math.cos(player.heading);
+      const sz = -Math.sin(player.heading);
+      nearest.mesh.position.set(player.x + fx * 1.6 + sx * 0.9, 0.14, player.z + fz * 1.6 + sz * 0.9);
+      if (nearest.alongX) nearest.at = nearest.mesh.position.x;
+      else nearest.at = nearest.mesh.position.z;
+      nearest.pause = 0;
+    }
+    const result = game.punch();
+    state.wanted = 1;
+    hud.setWanted(1);
+    // The patrol car ahead of her, not behind the camera: stage the chase with
+    // a reversed heading so the "behind" offset lands in front of the player.
+    stageChase(police, player.x, player.z, player.heading + Math.PI, 1, 20);
+    hud.showToast('Punch landed — a witness called the PD', 60);
+    return result;
+  },
+  /** Stage the activity screenshot: Marisol on foot before the first ramp, a
+   *  Shore Coin gleaming beside it, HUD tracker on. */
+  placeAtActivity() {
+    moveCoin(activities, 0, 19.5, -33);
+    game.placePlayer(23, -48, 0);
+    game.setCameraYaw(Math.PI);
+    game.hud.showToast('Shore Coins 0/12 — grab them all, jump the ramps!', 60);
+    game.hud.setCoins(0);
   },
   setCameraYaw(yaw) {
     player.cameraYaw = yaw;
@@ -191,7 +252,8 @@ const game = {
       hud.tickBanner(dt);
       stepWanted(dt);
       stepMissions(dt);
-      hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles), ...policeDots(police), ...missions.dots()]);
+      stepSideSystems(dt);
+      hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles), ...policeDots(police), ...missions.dots(), ...activityDots(activities)]);
       return;
     }
     stepPlayer(player, move, city.colliders, dt);
@@ -208,7 +270,8 @@ const game = {
     hud.tickBanner(dt);
     stepWanted(dt);
     stepMissions(dt);
-    hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles), ...policeDots(police), ...missions.dots()]);
+    stepSideSystems(dt);
+    hud.drawMinimap(player, [...trafficDots(traffic), ...vehicleDots(vehicles), ...policeDots(police), ...missions.dots(), ...activityDots(activities)]);
     audio.stepFootsteps(player.moving, player.speed > 8);
   },
   render() {
@@ -356,6 +419,93 @@ function applyBusted() {
   writeSave(snapshotSave());
 }
 
+/** Distance to the nearest police unit (car or foot cop); Infinity when none. */
+function nearestPoliceDist() {
+  let best = Infinity;
+  for (const car of police.cars) best = Math.min(best, Math.hypot(car.x - player.x, car.z - player.z));
+  for (const cop of police.cops) best = Math.min(best, Math.hypot(cop.x - player.x, cop.z - player.z));
+  return best;
+}
+
+/** Night 5 systems, one step: combat (cop baton hits, regen, WASTED), Shore
+ *  Coins, stunt ramps, and the per-frame engine/siren audio. */
+function stepSideSystems(dt) {
+  const combatResult = stepCombat(combat, player, traffic, police, state.health, dt);
+  if (combatResult.health !== state.health) {
+    state.health = combatResult.health;
+    hud.setHealth(state.health);
+  }
+  if (combatResult.wasted) {
+    applyWasted();
+    return;
+  }
+  const world = {
+    x: player.x,
+    z: player.z,
+    driving: !!state.driving,
+    speed: state.driving ? Math.abs(state.driving.speed) : player.speed,
+    drivenMesh: state.driving ? state.driving.mesh : null,
+  };
+  for (const event of stepActivities(activities, world, dt)) {
+    if (event.type === 'coin') {
+      state.cash += COIN_REWARD;
+      hud.setCash(state.cash);
+      hud.setCoins(event.total);
+      audio.coin();
+      hud.showToast(`Shore Coin +$${COIN_REWARD} (${event.total}/12)`, 2);
+    } else if (event.type === 'coinBonus') {
+      state.cash += COIN_BONUS;
+      hud.setCash(state.cash);
+      hud.showToast(`All 12 Shore Coins! Bonus +$${COIN_BONUS}`, 4);
+    } else if (event.type === 'stunt') {
+      state.cash += STUNT_REWARD;
+      hud.setCash(state.cash);
+      audio.stunt();
+      hud.showToast(`STUNT! +$${STUNT_REWARD}`, 3);
+    }
+  }
+  audio.stepAudio(!!state.driving, world.speed, state.wanted, nearestPoliceDist());
+}
+
+/** WASTED: the hospital patches Marisol up for a cut of her cash, the heat
+ *  resets, and she wakes up back at the precinct steps on foot. */
+function applyWasted() {
+  const fine = wastedFine(state.cash);
+  state.cash -= fine;
+  state.health = START.health;
+  state.wanted = 0;
+  state.evading = false;
+  wantedMode = 'clear';
+  if (state.driving) {
+    exitCar(vehicles, player);
+    state.driving = null;
+    player.group.visible = true;
+  }
+  clearPolice(police);
+  player.x = START.spawn.x;
+  player.z = START.spawn.z;
+  player.heading = START.spawn.heading;
+  player.cameraYaw = START.spawn.heading + Math.PI;
+  player.cameraPitch = 0.32;
+  snapCamera(player, camera);
+  hud.setCash(state.cash);
+  hud.setHealth(state.health);
+  hud.setWanted(0);
+  hud.setWantedState('clear');
+  hud.setSpeed(0, 'on foot');
+  hud.showBanner(
+    'WASTED',
+    fine > 0
+      ? `Shore General patched you up — $${fine.toLocaleString('en-US')} in hospital bills`
+      : 'Shore General patched you up',
+    4,
+  );
+  hud.showToast('WASTED — back at the precinct steps', 4);
+  // WASTED blows the active mission too.
+  applyMissionEvents(missions.fail('wasted'));
+  writeSave(snapshotSave());
+}
+
 function snapshotSave() {
   return {
     x: player.x,
@@ -370,6 +520,7 @@ function snapshotSave() {
     vehicles: serializeVehicles(vehicles),
     missionIndex: missions.state.index,
     missionsDone: [...missions.state.done],
+    ...serializeActivities(activities),
   };
 }
 
@@ -386,6 +537,8 @@ function applySave(save) {
   state.minutes = save.minutes;
   state.objective = save.objective;
   missions.restore(save.missionIndex, save.missionsDone);
+  restoreActivities(activities, save);
+  hud.setCoins(coinsCollected(activities));
   player.x = save.x;
   player.z = save.z;
   player.heading = save.heading;
@@ -510,6 +663,9 @@ function runGame() {
     }
     if (actions & ACTION_ENTER) {
       if (state.screen === 'play') tryEnterCar();
+    }
+    if (actions & ACTION_ATTACK) {
+      if (state.screen === 'play' && !state.driving) game.punch();
     }
     if (actions & ACTION_MISSION) {
       if (state.screen === 'play') {

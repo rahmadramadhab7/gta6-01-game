@@ -7,6 +7,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a2233; }
 #hud-top-left { position: absolute; top: 14px; left: 16px; }
 #cash { font-size: 30px; font-weight: 800; letter-spacing: .5px; color: #7ee787; }
 #objective { margin-top: 4px; font-size: 14px; background: rgba(10, 14, 26, .55); padding: 6px 10px; border-radius: 6px; border-left: 3px solid #ffb454; max-width: 560px; }
+#coins { margin-top: 4px; font-size: 14px; font-weight: 700; color: #ffd166; background: rgba(10, 14, 26, .55); padding: 6px 10px; border-radius: 6px; display: inline-block; }
 #hud-top-right { position: absolute; top: 14px; right: 16px; text-align: right; }
 #wanted { font-size: 26px; letter-spacing: 4px; color: #ffd166; }
 #wanted .lit { color: #ff5a4e; }

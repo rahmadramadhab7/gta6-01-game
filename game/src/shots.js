@@ -1,4 +1,4 @@
-// The screenshot scenes behind ?shot=play|street|pier|drive|police|start. Each one plays the real
+// The screenshot scenes behind ?shot=play|street|pier|drive|police|mission|combat|activity|start. Each one plays the real
 // game forward from a fresh world for a fixed number of steps, steered by a simple
 // autopilot that walks the player forward, so the frame is what a short game really
 // looks like and the same seed always gives the same frame.
@@ -41,10 +41,32 @@ function driveForward(game, seconds) {
  *  - mission: Heat Escape in progress — a stolen car at three stars racing for
  *    the beach safehouse, two patrol cars on its tail, the safehouse beacon and
  *    the mission objective on the HUD.
+ *  - combat: Marisol mid-punch on the Marina Avenue — a pedestrian reeling from
+ *    the hit (sparks, red flash), one wanted star, a patrol car closing in.
+ *  - activity: Marisol on foot before the first stunt ramp, a gold Shore Coin
+ *    gleaming beside it, the Coins 0/12 tracker on the HUD.
  *  - start (or anything else): the title screen over the city at dusk.
  */
 export function stageShot(name, game) {
   game.reset();
+  if (name === 'combat') {
+    // A crowd on the Marina Avenue: walk west into the pedestrians, then land
+    // a punch on the nearest one — sparks, flash, one star, a patrol car in frame.
+    game.placePlayer(23, 23, -Math.PI / 2);
+    walkForward(game, 2);
+    game.setCameraDistance(12);
+    game.stageCombatHit();
+    game.showHud();
+    return { screen: 'play' };
+  }
+  if (name === 'activity') {
+    // Side activities in one frame: the first stunt ramp ahead, a Shore Coin
+    // gleaming beside it, the Coins tracker on the HUD.
+    game.placeAtActivity();
+    idle(game, 1);
+    game.showHud();
+    return { screen: 'play' };
+  }
   if (name === 'mission') {
     // Heat Escape (M4) mid-run: move a parked car to the west avenue, steal it,
     // and race it toward the beach safehouse at three stars with two patrol cars

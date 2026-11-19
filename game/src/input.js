@@ -7,6 +7,7 @@ export const ACTION_MUTE = 2;
 export const ACTION_ENTER = 4;
 export const ACTION_MISSION = 8;
 export const ACTION_RESTART = 16;
+export const ACTION_ATTACK = 32;
 
 export function createInput(canvas) {
   const keys = new Set();
@@ -16,6 +17,8 @@ export function createInput(canvas) {
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
+  let downX = 0;
+  let downY = 0;
 
   function keyDown(event) {
     if (event.repeat) return;
@@ -23,6 +26,7 @@ export function createInput(canvas) {
     if (event.code === 'KeyP' || event.code === 'Escape') actions |= ACTION_PAUSE;
     if (event.code === 'KeyM') actions |= ACTION_MUTE;
     if (event.code === 'KeyE') actions |= ACTION_ENTER;
+    if (event.code === 'KeyF') actions |= ACTION_ATTACK;
     if (event.code === 'KeyJ') actions |= ACTION_MISSION;
     if (event.code === 'KeyR') actions |= ACTION_RESTART;
   }
@@ -33,6 +37,8 @@ export function createInput(canvas) {
     dragging = true;
     lastX = event.clientX;
     lastY = event.clientY;
+    downX = event.clientX;
+    downY = event.clientY;
     canvas.setPointerCapture(event.pointerId);
   }
   function pointerMove(event) {
@@ -42,7 +48,9 @@ export function createInput(canvas) {
     lastX = event.clientX;
     lastY = event.clientY;
   }
-  function pointerUp() {
+  function pointerUp(event) {
+    // A click (press and release almost in place) is a punch; a drag orbits the camera.
+    if (Math.hypot(event.clientX - downX, event.clientY - downY) < 6) actions |= ACTION_ATTACK;
     dragging = false;
   }
 

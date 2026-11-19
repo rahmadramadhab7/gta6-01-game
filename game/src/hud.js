@@ -27,6 +27,7 @@ export function createHud() {
     healthText: document.getElementById('health-text'),
     clock: document.getElementById('clock'),
     speed: document.getElementById('speed'),
+    coins: document.getElementById('coins'),
     toast: document.getElementById('toast'),
     minimap: document.getElementById('minimap'),
   };
@@ -91,6 +92,10 @@ export function createHud() {
     },
     setSpeed(mph, mode) {
       elements.speed.textContent = `${Math.round(mph)} mph · ${mode}`;
+    },
+    /** Shore Coins tracker: how many of the twelve are pocketed. */
+    setCoins(collected, total = 12) {
+      if (elements.coins) elements.coins.textContent = `Coins ${collected}/${total}`;
     },
     showToast(message, seconds = 4) {
       elements.toast.textContent = message;
@@ -167,6 +172,14 @@ export function createHud() {
           ctx.strokeStyle = 'rgba(255,255,255,0.9)';
           ctx.lineWidth = 1;
           ctx.stroke();
+          continue;
+        }
+        if (dot.kind === 'coin') {
+          // An uncollected Shore Coin: a small gold dot.
+          ctx.fillStyle = '#ffd166';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+          ctx.fill();
           continue;
         }
         ctx.fillStyle = dot.kind === 'car' ? '#ffd166' : 'rgba(255,255,255,0.7)';
