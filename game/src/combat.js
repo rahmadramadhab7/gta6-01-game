@@ -223,6 +223,19 @@ export function stepCombat(combat, player, traffic, police, health, dt = STEP) {
   return { wasted: nextHealth <= 0, health: nextHealth };
 }
 
+/**
+ * Apply direct damage to Marisol's health through the same bookkeeping as
+ * every other hit: the regen clock restarts, health clamps at zero, and the
+ * caller learns whether she is WASTED. Used by patrol-car rams on foot.
+ * Returns `{ health, wasted }`.
+ */
+export function applyDamage(combat, health, amount) {
+  if (!(amount > 0)) return { health, wasted: health <= 0 };
+  combat.sinceHurt = 0;
+  const next = Math.max(0, health - amount);
+  return { health: next, wasted: next <= 0 };
+}
+
 /** Cash lost when WASTED: 10% of the wallet, at least $25 when there is cash. */
 export function wastedFine(cash) {
   if (cash <= 0) return 0;

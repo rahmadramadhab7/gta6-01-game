@@ -30,6 +30,7 @@ export function createHud() {
     coins: document.getElementById('coins'),
     toast: document.getElementById('toast'),
     minimap: document.getElementById('minimap'),
+    damageLayer: document.getElementById('damage-layer'),
   };
   const ctx = elements.minimap.getContext('2d');
   let toastTimer = 0;
@@ -96,6 +97,24 @@ export function createHud() {
     /** Shore Coins tracker: how many of the twelve are pocketed. */
     setCoins(collected, total = 12) {
       if (elements.coins) elements.coins.textContent = `Coins ${collected}/${total}`;
+    },
+    /**
+     * A floating damage number at screen pixel (x, y): it pops, drifts up and
+     * fades in just under a second (the .damage-number CSS animation), then
+     * removes itself. `kind` is 'npc' for damage Marisol deals (gold) or
+     * 'player' for damage she takes (red, shown as a negative).
+     */
+    showDamageNumber(x, y, amount, kind = 'npc') {
+      const layer = elements.damageLayer;
+      if (!layer || !(amount > 0)) return;
+      while (layer.children.length >= 12) layer.firstChild.remove();
+      const el = document.createElement('div');
+      el.className = kind === 'player' ? 'damage-number damage-player' : 'damage-number';
+      el.textContent = kind === 'player' ? `-${amount}` : `${amount}`;
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      layer.appendChild(el);
+      setTimeout(() => el.remove(), 1000);
     },
     showToast(message, seconds = 4) {
       elements.toast.textContent = message;

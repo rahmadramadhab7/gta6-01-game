@@ -17,7 +17,7 @@ import { createAudio } from './audio.js';
 import { ACTION_ATTACK, ACTION_ENTER, ACTION_MISSION, ACTION_MUTE, ACTION_PAUSE, ACTION_RESTART, createInput } from './input.js';
 import { clearSave, defaultSave, hasSave, loadSave, writeSave } from './save.js';
 import { createMissions } from './mission.js';
-import { createCombat, stepCombat, tryPunch, wastedFine } from './combat.js';
+import { applyDamage, createCombat, stepCombat, tryPunch, wastedFine } from './combat.js';
 import { COIN_BONUS, COIN_REWARD, STUNT_REWARD, activityDots, coinsCollected, createActivities, moveCoin, resetActivities, restoreActivities, serializeActivities, stepActivities } from './activity.js';
 import { stageShot } from './shots.js';
 
@@ -164,6 +164,9 @@ const game = {
     if (!result) return null;
     if (result.hit) {
       audio.punch();
+      if (result.victim) {
+        showDamageAt(result.victim.mesh.position.x, 1.9, result.victim.mesh.position.z, result.damage, 'npc');
+      }
       if (result.witnessed && state.wanted < 5) {
         state.wanted = Math.min(5, state.wanted + 1);
         hud.setWanted(state.wanted);
@@ -311,6 +314,22 @@ function tryEnterCar() {
   return found;
 }
 
+/**
+ * Project a world position to screen pixels and float a damage number there
+ * (gold for damage Marisol deals, red for damage she takes). Behind the
+ * camera there is nothing sensible to draw, so the number is skipped.
+ */
+function showDamageAt(worldX, worldY, worldZ, amount, kind) {
+  const projected = new THREE.Vector3(worldX, worldY, worldZ).project(camera);
+  if (projected.z > 1 || projected.z < -1) return;
+  hud.showDamageNumber(
+    (projected.x * 0.5 + 0.5) * window.innerWidth,
+    (-projected.y * 0.5 + 0.5) * window.innerHeight,
+    amount,
+    kind,
+  );
+}
+
 /** One step of the wanted system: the chase advances, stars move, a bust ends the run. */
 let wantedMode = 'clear';
 function stepWanted(dt) {
@@ -323,6 +342,34 @@ function stepWanted(dt) {
     driven: state.driving,
     colliders: city.colliders,
   }, dt);
+  // A patrol car running Marisol down on foot: real damage through the combat
+  // health system (regen clock reset, WASTED at zero), a knockback step away
+  // from the nearest car, and a red floating number over her head.
+  if (result.rammedFoot && result.ramDamage > 0 && !state.driving) {
+    const applied = applyDamage(combat, state.health, result.ramDamage);
+    state.health = applied.health;
+    hud.setHealth(state.health);
+    let nearestCar = null;
+    let nearestDist = Infinity;
+    for (const car of police.cars) {
+      const dist = Math.hypot(car.x - player.x, car.z - player.z);
+      if (dist < nearestDist) { nearestDist = dist; nearestCar = car; }
+    }
+    if (nearestCar) {
+      const awayX = player.x - nearestCar.x;
+      const awayZ = player.z - nearestCar.z;
+      const awayLen = Math.hypot(awayX, awayZ) || 1;
+      player.x += (awayX / awayLen) * 1.1;
+      player.z += (awayZ / awayLen) * 1.1;
+      player.group.position.set(player.x, 0, player.z);
+    }
+    showDamageAt(player.x, 2.1, player.z, result.ramDamage, 'player');
+    hud.showToast('Run down by a patrol car!', 2);
+    if (applied.wasted) {
+      applyWasted();
+      return;
+    }
+  }
   if (result.wantedDelta !== 0) {
     state.wanted = Math.max(0, Math.min(5, state.wanted + result.wantedDelta));
     hud.setWanted(state.wanted);

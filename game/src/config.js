@@ -84,6 +84,13 @@ export const POLICE = {
   ramSpeed: 12,
   /** Seconds before another ram can raise the wanted level again. */
   ramCooldown: 5,
+  /** On foot, a patrol car slower than this (world units/s) only bumps Marisol: no damage. */
+  footRamMinSpeed: 6,
+  /** On-foot ram damage per unit of patrol-car speed, before the caps below. */
+  footRamDamageScale: 0.7,
+  /** On-foot ram damage is clamped between these two numbers. */
+  footRamMinDamage: 6,
+  footRamMaxDamage: 22,
   /** A patrol car this close can make the arrest (player in a car). */
   bustDistance: 4.5,
   /** A foot cop this close can make the arrest (player on foot). */

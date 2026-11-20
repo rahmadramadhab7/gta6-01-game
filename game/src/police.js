@@ -13,6 +13,20 @@ function distance(a, b) {
   return Math.hypot(a.x - b.x, a.z - b.z);
 }
 
+/**
+ * Damage a patrol car deals when it runs into Marisol while she is on foot:
+ * nothing at a crawl, otherwise proportional to the car's speed and capped,
+ * so one hit hurts but never kills outright. Pure, so it can be unit-tested.
+ */
+export function patrolRamDamage(speed) {
+  const v = Math.abs(speed);
+  if (v < POLICE.footRamMinSpeed) return 0;
+  return Math.min(
+    POLICE.footRamMaxDamage,
+    Math.max(POLICE.footRamMinDamage, Math.round(v * POLICE.footRamDamageScale)),
+  );
+}
+
 /** Push a circle out of an axis-aligned box it overlaps; true when it hit one. */
 function resolveCircle(position, radius, colliders) {
   let hit = false;
@@ -137,7 +151,7 @@ function copSpot(police, px, pz) {
 export function stepPolice(police, world, dt) {
   police.time += dt;
   if (police.ramCooldown > 0) police.ramCooldown -= dt;
-  const result = { busted: false, wantedDelta: 0, rammed: false };
+  const result = { busted: false, wantedDelta: 0, rammed: false, rammedFoot: false, ramDamage: 0 };
   const wanted = Math.max(0, Math.min(5, world.wanted));
 
   // --- Patrol cars: one per wanted star, up to the cap. ---
@@ -187,7 +201,10 @@ export function stepPolice(police, world, dt) {
       car.blockedTimer = 0;
     }
     // Ramming the player: slow the driven car hard, and ramming a patrol car
-    // at speed is a fresh crime — the wanted level goes up.
+    // at speed is a fresh crime — the wanted level goes up. On foot there is
+    // no car to slow: the patrol car runs Marisol down instead, dealing
+    // speed-scaled damage (reported as ramDamage for the health system to
+    // apply), at most once a second per car so she is not insta-killed.
     if (dist < POLICE.ramDistance) {
       if (world.driving && world.driven) {
         if (world.speed > POLICE.ramSpeed && police.ramCooldown <= 0) {
@@ -200,6 +217,14 @@ export function stepPolice(police, world, dt) {
           car.ramHitCooldown = 1;
         }
         car.speed *= 0.6;
+      } else if (!world.driving && car.ramHitCooldown <= 0) {
+        const damage = patrolRamDamage(car.speed);
+        if (damage > 0) {
+          result.ramDamage = Math.max(result.ramDamage, damage);
+          result.rammedFoot = true;
+          car.ramHitCooldown = 1;
+          car.speed *= 0.65;
+        }
       }
     }
     car.mesh.position.set(car.x, 0, car.z);

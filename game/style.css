@@ -28,6 +28,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1a2233; }
 #hint { font-size: 12px; opacity: .65; margin-top: 6px; }
 #minimap { position: absolute; right: 16px; bottom: 14px; border: 2px solid rgba(245, 239, 228, .5); border-radius: 50%; background: #10182a; box-shadow: 0 2px 12px rgba(0,0,0,.5); }
 #toast { position: absolute; top: 84px; left: 50%; transform: translateX(-50%); background: rgba(10, 14, 26, .75); border: 1px solid #ffb454; border-radius: 8px; padding: 10px 18px; font-size: 16px; font-weight: 600; }
+#damage-layer { position: absolute; inset: 0; overflow: hidden; }
+.damage-number { position: absolute; transform: translate(-50%, -50%); font-size: 22px; font-weight: 900; color: #ffd166; text-shadow: 0 0 6px rgba(0,0,0,.9), 0 2px 3px rgba(0,0,0,.85); animation: damage-float .95s ease-out forwards; }
+.damage-number.damage-player { color: #ff5a4e; font-size: 26px; }
+@keyframes damage-float { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 15% { opacity: 1; transform: translate(-50%, -65%) scale(1.1); } 100% { opacity: 0; transform: translate(-50%, -230%) scale(1); } }
 
 #start-screen, #pause-screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(26, 20, 48, .25) 0%, rgba(26, 20, 48, .72) 100%); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #f5efe4; }
 #start-screen[hidden], #pause-screen[hidden], #hud[hidden] { display: none; }
